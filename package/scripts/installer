@@ -1,0 +1,77 @@
+#!/bin/sh
+
+# Synology Package Install Script for Photo Organizer
+
+INSTALL_DIR="/var/packages/photo-organizer"
+PYTHON3_PATH="/usr/bin/python3"
+PIP3_PATH="/usr/bin/pip3"
+
+# Create installation directory
+mkdir -p ${INSTALL_DIR}/target
+mkdir -p ${INSTALL_DIR}/var
+mkdir -p ${INSTALL_DIR}/etc
+
+# Copy package files
+if [ -n "${SYNOPKG_PKGDEST}" ]; then
+    cp -r ${SYNOPKG_PKGDEST}/package/* ${INSTALL_DIR}/target/
+else
+    # Fallback if SYNOPKG_PKGDEST is not set
+    cp -r /tmp/photo-organizer/package/* ${INSTALL_DIR}/target/ 2>/dev/null || true
+fi
+
+# Install Python dependencies
+if [ -f "${PIP3_PATH}" ]; then
+    ${PIP3_PATH} install --upgrade pip
+    ${PIP3_PATH} install Pillow watchdog imagehash
+else
+    echo "Error: pip3 not found. Please install Python3 package first."
+    exit 1
+fi
+
+# Create necessary directories
+mkdir -p ${INSTALL_DIR}/target/Photos/PhotosToProcess
+mkdir -p ${INSTALL_DIR}/target/Photos
+
+# Set permissions
+chmod +x ${INSTALL_DIR}/target/organize_photos.py
+
+# Create service script
+cat > ${INSTALL_DIR}/etc/service.sh << 'EOF'
+#!/bin/sh
+case "$1" in
+    start)
+        /usr/bin/python3 /var/packages/photo-organizer/target/organize_photos.py &
+        echo $! > /var/packages/photo-organizer/var/photo-organizer.pid
+        ;;
+    stop)
+        if [ -f /var/packages/photo-organizer/var/photo-organizer.pid ]; then
+            kill $(cat /var/packages/photo-organizer/var/photo-organizer.pid)
+            rm /var/packages/photo-organizer/var/photo-organizer.pid
+        fi
+        ;;
+    status)
+        if [ -f /var/packages/photo-organizer/var/photo-organizer.pid ]; then
+            if ps -p $(cat /var/packages/photo-organizer/var/photo-organizer.pid) > /dev/null 2>&1; then
+                echo "Photo Organizer is running"
+                exit 0
+            else
+                echo "Photo Organizer is not running"
+                exit 1
+            fi
+        else
+            echo "Photo Organizer is not running"
+            exit 1
+        fi
+        ;;
+    *)
+        echo "Usage: $0 {start|stop|status}"
+        exit 1
+        ;;
+esac
+EOF
+
+chmod +x ${INSTALL_DIR}/etc/service.sh
+
+echo "Photo Organizer installed successfully"
+exit 0
+

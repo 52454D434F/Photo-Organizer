@@ -1,0 +1,20 @@
+#!/bin/sh
+
+# Synology Package Uninstall Script for Photo Organizer
+
+INSTALL_DIR="/var/packages/photo-organizer"
+
+# Stop the service if running
+if [ -f ${INSTALL_DIR}/var/photo-organizer.pid ]; then
+    kill $(cat ${INSTALL_DIR}/var/photo-organizer.pid) 2>/dev/null
+    rm -f ${INSTALL_DIR}/var/photo-organizer.pid
+fi
+
+# Remove installation directory
+if [ -d "${INSTALL_DIR}" ]; then
+    rm -rf ${INSTALL_DIR}
+fi
+
+echo "Photo Organizer uninstalled successfully"
+exit 0
+
