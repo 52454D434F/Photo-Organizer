@@ -48,6 +48,15 @@ def get_file_date(file_path):
         print(f"Error reading file date from {file_path}: {e}")
         return None
 
+def get_file_modification_time(file_path):
+    """Get the modification time of a file as datetime object."""
+    try:
+        modification_time = os.path.getmtime(file_path)
+        return datetime.fromtimestamp(modification_time)
+    except Exception as e:
+        print(f"Error reading modification time from {file_path}: {e}")
+        return None
+
 def format_datetime_for_filename(dt):
     """Format datetime object as yyyymmdd_hhmmss."""
     return dt.strftime('%Y%m%d_%H%M%S')
@@ -148,8 +157,48 @@ def process_photo(file_path):
                 print(f"Error moving duplicate {original_filename}: {e}")
             return
         else:
-            # Files have different content, skip to avoid overwriting
-            print(f"File {dest_filename} exists but has different content (MD5 mismatch). Skipping {original_filename}...")
+            # Files have different content (MD5 mismatch), check which file was modified
+            print(f"File {dest_filename} exists but has different content (MD5 mismatch). Checking modification times...")
+            source_mod_time = get_file_modification_time(file_path)
+            dest_mod_time = get_file_modification_time(dest_path)
+            
+            if source_mod_time and dest_mod_time:
+                # Determine which file is newer (modified)
+                if source_mod_time > dest_mod_time:
+                    # Source file is newer, move it to Duplicates
+                    file_to_move = file_path
+                    file_name = dest_filename
+                    print(f"Source file is newer (modified: {source_mod_time}). Moving to Duplicates folder.")
+                else:
+                    # Destination file is newer, move it to Duplicates and keep source
+                    file_to_move = dest_path
+                    file_name = dest_filename
+                    print(f"Destination file is newer (modified: {dest_mod_time}). Moving destination to Duplicates, keeping source.")
+            else:
+                # Fallback if we can't get modification times
+                file_to_move = file_path
+                file_name = dest_filename
+                print(f"Unable to get modification times. Moving source file to Duplicates folder.")
+            
+            # Move the modified file to Duplicates folder
+            duplicates_folder = os.path.join(DEST_DIR, 'Duplicates')
+            ensure_dir(duplicates_folder)
+            unique_filename = get_unique_duplicate_filename(duplicates_folder, file_name)
+            duplicates_path = os.path.join(duplicates_folder, unique_filename)
+            
+            try:
+                shutil.move(file_to_move, duplicates_path)
+                print(f"Moved file to {duplicates_path}")
+                
+                # If we moved the destination file, now move the source to its place
+                if file_to_move == dest_path:
+                    try:
+                        shutil.move(file_path, dest_path)
+                        print(f"Moved source file to {dest_path}")
+                    except Exception as e:
+                        print(f"Error moving source file to destination: {e}")
+            except Exception as e:
+                print(f"Error moving file to Duplicates: {e}")
             return
     
     if photo_datetime:

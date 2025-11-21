@@ -1,3 +1,6 @@
 # Exclude Photos folder from Git commits
 Photos/
+Test Files/
 
+# Exclude .gitignore file itself
+.gitignore
